@@ -1,6 +1,6 @@
 # Thesis Defense Coordination Agent
 
-[![CI](https://github.com/<Mustafa-Abbara>/defense-coordination-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/<Mustafa-Abbara>/defense-coordination-agent/actions/workflows/ci.yml)
+[![CI](https://github.com/Mustafa-Abbara/defense-coordination-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Mustafa-Abbara/defense-coordination-agent/actions/workflows/ci.yml)
 
 Agentic Systems 503N/798S, Fall 2026, Path A. One orchestrating agent, deterministic
 services, and human approval coordinate a thesis defense from the first availability
