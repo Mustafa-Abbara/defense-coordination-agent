@@ -1,0 +1,7 @@
+# Store text files with LF line endings in git on every OS.
+# Reason: file hashes (held-out SHA256SUMS in ST-07, prompt version hashes)
+# must be identical on Windows and Linux.
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.zip binary

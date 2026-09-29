@@ -1,0 +1,81 @@
+# Project metadata, dependencies, and tool settings in one file.
+# Every version is pinned with "==" so that everyone (me, CI, the grader)
+# installs exactly the same packages. Change a version on purpose, never by accident.
+
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "defense-coordination-agent"
+version = "0.1.0"
+description = "Thesis Defense Coordination Agent (Agentic Systems 503N/798S, Path A)."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+# Runtime dependencies. Rule from docs/architecture.md: a new runtime
+# dependency is added to the technology table there first, with its reason.
+# ST-00 only needs tzdata (IANA time zones for zoneinfo on Windows, ADR-012).
+# Later stages add pydantic, PyYAML, FastAPI, ... in the stage that uses them.
+dependencies = [
+    "tzdata==2026.4",
+]
+
+[project.optional-dependencies]
+# Development tools: install with  pip install -e ".[dev]"
+dev = [
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "ruff==0.16.9",
+]
+
+[tool.setuptools.packages.find]
+# Only the application code is an installable package.
+# eval/, tests/, docs/ and config/ are run from the repository root.
+include = ["app*"]
+
+# ---------------------------------------------------------------- Ruff
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+# docs/ holds design documents. Their code blocks are illustrative pseudocode
+# (aligned comments, one-line "if x: return"), not project code, so Ruff
+# must not lint or reformat them.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+# E/W = pycodestyle, F = pyflakes (real bugs), I = import order,
+# B = bugbear (common mistakes), UP = modern Python syntax,
+# DTZ = naive-datetime mistakes (interfaces.md: all datetimes are UTC-aware),
+# TID = tidy imports, which contains TID251 "banned API" used below.
+select = ["E", "W", "F", "I", "B", "UP", "DTZ", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# ADR-010: all code must get time from the Clock interface, so that the
+# simulated clock controls time in tests, evaluation runs, and the demo.
+# Ruff resolves imports, so aliases such as
+#   from datetime import datetime as dt; dt.now()
+# are caught too.
+"datetime.datetime.now".msg = "Use the Clock interface (ADR-010), not datetime.now()."
+"datetime.datetime.utcnow".msg = "Use the Clock interface (ADR-010), not datetime.utcnow()."
+"datetime.datetime.today".msg = "Use the Clock interface (ADR-010), not datetime.today()."
+"datetime.date.today".msg = "Use the Clock interface (ADR-010), not date.today()."
+
+[tool.ruff.lint.per-file-ignores]
+# The one place allowed to read the real system time (SystemClock, ST-04).
+"app/adapters/clock.py" = ["TID251"]
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -ra: print a short reason for every skipped or failed test.
+# --strict-markers: a typo in a marker name is an error, not a silent no-op.
+addopts = "-ra --strict-markers"
+xfail_strict = true
+
+# ---------------------------------------------------------------- coverage
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
