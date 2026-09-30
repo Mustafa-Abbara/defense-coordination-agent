@@ -6,6 +6,8 @@ title = "defense-coordination-agent"
 useDefault = true
 
 [[allowlists]]
-description = "Deliberately fake key used as hostile input in tests/security/test_repo_hygiene.py"
-# Only this exact fake string is allowed. Any other key-like string still fails the scan.
-regexes = ['''sk-live-1234567890''']
+description = "Deliberately fake keys used as hostile input in tests"
+# Only these exact fake strings are allowed. Any other key-like string still fails the scan.
+#   sk-live-1234567890   tests/security/test_repo_hygiene.py  (B-2)
+#   sk-live-CANARY-7F3A  tests/unit/test_config.py, test_api_key_is_hidden_in_repr_and_dump (ST-02)
+regexes = ['''sk-live-1234567890''', '''sk-live-CANARY-7F3A''']

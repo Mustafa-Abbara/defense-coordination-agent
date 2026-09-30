@@ -51,6 +51,7 @@ Related documents: `state_machine.md`, `interfaces.md` (error model, pipeline, r
 | FM-24 | Budget exhausted (run cap or total cap) | LLMClient budget guard | `BUDGET_EXCEEDED` before a call | Medium | No more LLM calls: extraction → manual form; planner → `BUDGET` escalation. Deterministic reminders continue | Student raises the cap or continues by hand | — | Yes | "LLM budget reached – assistant paused; manual mode available" | HUMAN | FM-24 |
 | FM-25 | Chair changes requirements (for example, hybrid now required) after invites or scheduling | Pipeline / manual edit, validators | Condition or attendance-mode change makes the booked room invalid | High | `RESCHEDULING` with `REQUIREMENT_CHANGED`. The agent tries same slot + hybrid room first | `RESCHEDULE` approval | — | Approval | Banner "Requirement changed: hybrid needed – current room not hybrid" | REPLAN | FM-25, S19 |
 | FM-26 | Agent loop stuck (repeats the same tool call, or never calls `wait`) | Loop controller | Step budget reached; repeated identical calls detected (same tool + args twice) | Medium | The repeated call is refused with an error. At the step budget the wake-up ends. Twice in a row → `STEP_BUDGET` escalation | Next event | — | After 2 exhausted wake-ups | "Assistant needs help" escalation with the last actions | AUTO → HUMAN | FM-26 |
+| FM-27 | Invalid configuration file (missing or misspelled field, wrong type, duplicate key, unsafe YAML tag, a list used as a key, not UTF-8) | Config loader (`app/core/config.py`) | `ConfigError` when the file is loaded | Medium (High if a wrong policy value were used silently) | Start-up stops before anything runs. The message names the file and every bad field. Nothing runs with a partly valid policy | Student fixes the file | — | Yes (the person starting the app) | "policy.yaml is invalid: notice_days: missing (this field is required)" | HUMAN | FM-27 (`tests/unit/test_config.py`; found in ST-02: a list used as a YAML key crashed with a raw `TypeError`) |
 
 ## Class summary
 
@@ -58,7 +59,7 @@ Related documents: `state_machine.md`, `interfaces.md` (error model, pipeline, r
 |---|---|
 | AUTO | FM-04, FM-11, FM-13, FM-14, FM-16, FM-18, FM-19 (and the first stage of FM-09, FM-10, FM-12, FM-21, FM-24, FM-26) |
 | REPLAN | FM-01 (optional member), FM-02, FM-03, FM-05, FM-06, FM-07, FM-08, FM-15, FM-17, FM-25 |
-| HUMAN | FM-01 (mandatory member), FM-20, FM-22, FM-23, FM-24, and the later stages of FM-09, FM-10, FM-12, FM-21, FM-26 |
+| HUMAN | FM-01 (mandatory member), FM-20, FM-22, FM-23, FM-24, FM-27, and the later stages of FM-09, FM-10, FM-12, FM-21, FM-26 |
 | TERMINAL | FM-23 when the escalation is ignored past the window end (`FAILED: WINDOW_PASSED`); a broken event-log hash chain (`FAILED: INTEGRITY`) |
 
 ## How the failure tests are built

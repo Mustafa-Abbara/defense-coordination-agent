@@ -27,8 +27,9 @@ Entities from the brief that were **merged or dropped**:
 | expected_audience | int | For room capacity |
 | status | enum (see `state_machine.md`) | |
 | state_version | int | Increases on every save; used for optimistic locking and approval staleness |
-| policy_version | str (sha256 of policy.yaml) | Frozen at start; shown in approvals |
+| policy_version | str (sha256 of the canonical JSON of the validated `policy.yaml` values) | Frozen at start; shown in approvals. Hashing the values, not the file bytes, means comments and CRLF/LF line endings do not change it; any changed value does |
 | scheduled_slot | Slot? | Set when approved |
+| previous_status | enum? | The status saved on entering `ESCALATED`; `RESUME` returns to it (`state_machine.md`). Never `ESCALATED` itself |
 | agent_paused | bool | Manual override (FR-23) |
 | budget_spent_usd, tokens_in, tokens_out | float, int | Running totals |
 | created_at, updated_at | datetime | Simulated clock time |
@@ -67,7 +68,7 @@ One statement = one piece of meaning from one message. A reply can produce sever
 | condition | enum? `HYBRID_REQUIRED`, `REMOTE_ONLY`, `IF_MEMBER_PRESENT`, `OTHER` | |
 | private_reason | str? | **Restricted.** For example "teaching". Visible only to the owner student (see the visibility table) |
 | confidence | float 0–1 | From the extractor, lowered by deterministic checks |
-| issues | list[IssueCode] | `AMBIGUOUS_DAY`, `AMBIGUOUS_WEEK`, `WEEKDAY_DATE_MISMATCH`, `OUT_OF_WINDOW`, `CONTRADICTS_PREVIOUS`, `CONDITION_UNCLEAR`, `TZ_UNCLEAR`, `UNPARSEABLE`, `SUSPICIOUS_INSTRUCTION` |
+| issues | list[IssueCode] | `AMBIGUOUS_DAY`, `AMBIGUOUS_WEEK`, `WEEKDAY_DATE_MISMATCH`, `OUT_OF_WINDOW`, `CONTRADICTS_PREVIOUS`, `CONDITION_UNCLEAR`, `TZ_UNCLEAR`, `UNPARSEABLE`, `SUSPICIOUS_INSTRUCTION`, `TRUNCATED` |
 | status | enum `ACTIVE`, `SUPERSEDED`, `RETRACTED`, `NEEDS_REVIEW` | |
 | supersedes_id | FK? | |
 | observed_at | datetime | Simulated time the statement was received; used for staleness |
@@ -102,6 +103,38 @@ part_of_day:                       # A-20
 
 `config/reminders.yaml` is also a placeholder (ASSUMPTION): first reminder after 3 days, second after 3 more, then `NON_RESPONSIVE`. At most 1 clarification per member per 2 days. At most 6 messages to one member for each defense.
 
+The file is checked by `app/core/config.py` → `PolicyConfig` when it is loaded (ST-02): every degree level must have a duration, required roles, and a minimum committee size (at most 7, because aliases are `M1`–`M7`); `part_of_day` must list `MORNING`, `AFTERNOON`, and `EVENING` (`null` disables one); every start is before its end. A missing field, an unknown field, a duplicate key, or an unsafe YAML tag stops loading with a message that names the file and the field.
+
+### Other configuration (ST-02)
+
+`config/reminders.yaml` (`ReminderConfig`, every value ASSUMPTION):
+
+```yaml
+first_reminder_after_days: 3          # after the poll, without a reply
+next_reminder_after_days: 3           # between reminders
+max_reminders: 2                      # then member -> NON_RESPONSIVE
+confirmation_reminder_after_days: 2   # in CONFIRMING
+clarification_min_gap_days: 2         # at most 1 clarification per member per 2 days
+max_messages_per_member: 6            # per member, per defense
+```
+
+`config/models.yaml` (`ModelsConfig`): `provider`, and for each call kind (`extractor`, `planner`): `model`, `timeout_seconds`, `max_retries`, `temperature`, `price_in_usd_per_million_tokens`, `price_out_usd_per_million_tokens`. Provider, models, and prices are not decided (ADR-008); ST-06 fills them in.
+
+`.env` (`Settings`, via pydantic-settings; names listed in `.env.example`):
+
+| Variable | Default | Notes |
+|---|---|---|
+| `APP_ENV` | `dev` | `dev`, `test`, or `prod` |
+| `DEMO_MODE` | `false` | Simulation controls exist only when `true` (TH-05) |
+| `LLM_API_KEY` | none | Secret (`SecretStr`); never printed (TH-08) |
+| `CONFIG_DIR` | `config` | Folder with the three YAML files |
+
+An unknown variable in `.env` is an error, so a misspelled name cannot be silently ignored.
+
+### Slot
+
+A time interval: `start`, `end` (UTC, `end` after `start`). Used by `Defense.scheduled_slot`. The solver's `SlotOption` (`interfaces.md`, T02) adds its own fields around the same interval.
+
 ### Room and Booking
 
 | Room field | Type | | Booking field | Type |
@@ -125,7 +158,7 @@ Rooms come from a mock catalogue (`eval/fixtures/rooms.yaml`), which is syntheti
 | direction | enum `IN`, `OUT` | |
 | provider_message_id | str | Used for deduplication |
 | content_hash | str | sha256 of the normalized body; second dedupe key |
-| thread_token | str | For example `[DEF-7Q2K]` in the subject; used for matching |
+| thread_token | str? | For example `[DEF-7Q2K]` in the subject; used for matching. Null when an inbound message had no valid token (it is quarantined, ADR-014) |
 | from_addr, to_addrs | str | PII |
 | subject | str | |
 | body_raw | str | **Restricted.** Inbound: the raw email. Outbound: the rendered text |

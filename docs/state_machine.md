@@ -182,6 +182,108 @@ Rules:
 
 ---
 
+## Transition tables (code: `app/core/state_machine.py`)
+
+The diagrams above show the idea. These two tables are the **exact** rules the code enforces (added in ST-02).
+`transition(state, event)` and `member_transition(state, event)` look up the pair `(state, event)`. A pair that is not in the table raises `IllegalTransitionError` and is logged. Nothing else in the code sets a status.
+A test (`tests/unit/test_state_machine.py`) reads these tables from this file and fails if the code table differs by even one row. **Change this file and the code together.**
+
+The event says *what happened*. The reason (for example `ROOM_LOST` or `NOTICE_DEADLINE_MISSED` for `DISRUPTED`, or `WINDOW_PASSED` / `INTEGRITY` for `FAILED`) is stored with the event in the event log; it does not change the target state.
+
+### Defense transition table
+
+| From | Event | To |
+|---|---|---|
+| `DRAFT` | `START_APPROVED` | `COLLECTING` |
+| `COLLECTING` | `SCHEDULE_PROPOSED` | `AWAITING_APPROVAL` |
+| `AWAITING_APPROVAL` | `APPROVAL_GRANTED` | `BOOKING` |
+| `AWAITING_APPROVAL` | `APPROVAL_REJECTED` | `COLLECTING` |
+| `AWAITING_APPROVAL` | `APPROVAL_EXPIRED` | `COLLECTING` |
+| `AWAITING_APPROVAL` | `APPROVAL_STALE` | `COLLECTING` |
+| `BOOKING` | `ROOM_CONFIRMED_INVITES_SENT` | `CONFIRMING` |
+| `BOOKING` | `ROOM_REJECTED` | `COLLECTING` |
+| `CONFIRMING` | `ALL_MANDATORY_CONFIRMED` | `SCHEDULED` |
+| `CONFIRMING` | `DISRUPTED` | `RESCHEDULING` |
+| `SCHEDULED` | `DEFENSE_TIME_PASSED` | `COMPLETED` |
+| `SCHEDULED` | `DISRUPTED` | `RESCHEDULING` |
+| `RESCHEDULING` | `SCHEDULE_PROPOSED` | `AWAITING_APPROVAL` |
+| `RESCHEDULING` | `MORE_REPLIES_NEEDED` | `COLLECTING` |
+| `COLLECTING` | `ESCALATE` | `ESCALATED` |
+| `AWAITING_APPROVAL` | `ESCALATE` | `ESCALATED` |
+| `BOOKING` | `ESCALATE` | `ESCALATED` |
+| `CONFIRMING` | `ESCALATE` | `ESCALATED` |
+| `SCHEDULED` | `ESCALATE` | `ESCALATED` |
+| `RESCHEDULING` | `ESCALATE` | `ESCALATED` |
+| `ESCALATED` | `RESUME` | *previous_status* |
+| `ESCALATED` | `WINDOW_PASSED` | `FAILED` |
+| `DRAFT` | `CANCEL` | `CANCELLED` |
+| `COLLECTING` | `CANCEL` | `CANCELLED` |
+| `AWAITING_APPROVAL` | `CANCEL` | `CANCELLED` |
+| `BOOKING` | `CANCEL` | `CANCELLED` |
+| `CONFIRMING` | `CANCEL` | `CANCELLED` |
+| `SCHEDULED` | `CANCEL` | `CANCELLED` |
+| `RESCHEDULING` | `CANCEL` | `CANCELLED` |
+| `ESCALATED` | `CANCEL` | `CANCELLED` |
+| `DRAFT` | `INTEGRITY_FAILURE` | `FAILED` |
+| `COLLECTING` | `INTEGRITY_FAILURE` | `FAILED` |
+| `AWAITING_APPROVAL` | `INTEGRITY_FAILURE` | `FAILED` |
+| `BOOKING` | `INTEGRITY_FAILURE` | `FAILED` |
+| `CONFIRMING` | `INTEGRITY_FAILURE` | `FAILED` |
+| `SCHEDULED` | `INTEGRITY_FAILURE` | `FAILED` |
+| `RESCHEDULING` | `INTEGRITY_FAILURE` | `FAILED` |
+| `ESCALATED` | `INTEGRITY_FAILURE` | `FAILED` |
+
+`RESUME` returns to `Defense.previous_status`, the state saved when the defense entered `ESCALATED`. It must be one of the six states that can escalate (`COLLECTING`, `AWAITING_APPROVAL`, `BOOKING`, `CONFIRMING`, `SCHEDULED`, `RESCHEDULING`). Otherwise the resume is refused.
+`COMPLETED`, `CANCELLED`, and `FAILED` have no exits.
+
+How the table resolves points the prose leaves open (decided in ST-02):
+
+- **`BOOKING` can escalate.** The diagram says "any active state", and `BOOKING` is transient, but the `BOOKING` details say a room service that stays down leads to `ESCALATED` (FM-06, FM-09). The details win.
+- **`INTEGRITY_FAILURE` works from every non-terminal state.** The diagram shows it only from `ESCALATED`, but `threat_model.md` (TH-06, SEC-08) needs it when the executor finds a broken hash chain, which happens in `AWAITING_APPROVAL` or `BOOKING`.
+- **`DRAFT` cannot escalate.** Nothing has been sent, and the agent does not run in `DRAFT`.
+- **One `DISRUPTED` event** covers a mandatory decline, a condition that cannot be met, a missed notice deadline, a lost room, and a changed requirement. The reason travels with the event.
+
+### Member transition table
+
+| From | Event | To |
+|---|---|---|
+| `NOT_CONTACTED` | `POLL_SENT` | `AWAITING_REPLY` |
+| `AWAITING_REPLY` | `REPLY_RECEIVED` | `REPLIED` |
+| `AWAITING_REPLY` | `REMINDERS_EXHAUSTED` | `NON_RESPONSIVE` |
+| `NON_RESPONSIVE` | `REPLY_RECEIVED` | `REPLIED` |
+| `REPLIED` | `ISSUES_FOUND` | `NEEDS_CLARIFICATION` |
+| `NEEDS_CLARIFICATION` | `CLARIFICATION_ASKED` | `CLARIFICATION_SENT` |
+| `CLARIFICATION_SENT` | `REPLY_RECEIVED` | `REPLIED` |
+| `REPLIED` | `INVITE_SENT` | `INVITED` |
+| `INVITED` | `CONFIRM_RECEIVED` | `CONFIRMED` |
+| `INVITED` | `DECLINE_RECEIVED` | `DECLINED` |
+| `CONFIRMED` | `DECLINE_RECEIVED` | `DECLINED` |
+| `DEFERRED` | `RECHECK_DUE` | `AWAITING_REPLY` |
+| `AWAITING_REPLY` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `REPLIED` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `NON_RESPONSIVE` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `NEEDS_CLARIFICATION` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `CLARIFICATION_SENT` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `DEFERRED` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `INVITED` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `CONFIRMED` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `DECLINED` | `DEFERRAL_RECEIVED` | `DEFERRED` |
+| `AWAITING_REPLY` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+| `REPLIED` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+| `NON_RESPONSIVE` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+| `NEEDS_CLARIFICATION` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+| `CLARIFICATION_SENT` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+| `DEFERRED` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+| `INVITED` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+| `CONFIRMED` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+| `DECLINED` | `WITHDRAWAL_RECEIVED` | `WITHDRAWN` |
+
+- "any → `DEFERRED`" and "any → `WITHDRAWN`" in the diagram mean every state **except** `NOT_CONTACTED` (the member has no thread token yet, so a message from them is quarantined, not applied) and `WITHDRAWN` (a withdrawal ends the member's part; only the student changes the committee).
+- A reply that has issues takes two steps: `REPLY_RECEIVED` (→ `REPLIED`), then `ISSUES_FOUND` (→ `NEEDS_CLARIFICATION`), as in the diagram.
+- Not in the table yet, on purpose: a clarification to a member who is not `NEEDS_CLARIFICATION` (T04 allows it), a second reply from a `REPLIED` member, a reply before `recheck_at` from a `DEFERRED` member, and new invites or re-polls after a reschedule. The stages that build those flows (ST-08, ST-09, ST-11, ST-13) add the rows here and in the code together.
+
+---
+
 ## Simulated clock
 
 ### Interface

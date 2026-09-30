@@ -62,3 +62,48 @@ Status words: **implemented** (code exists), **tested** (automated test passes),
 
 **Open issues**
 - Indirect dependencies are not locked (no lock file); pip-audit still audits them.
+
+---
+
+## ST-02 Domain models, configuration, and state machine table (30 Sep 2026)
+
+**Built**
+- `app/core/enums.py`: every enum in `data_model.md`, plus `DefenseEvent` and `MemberEvent`.
+- `app/core/fields.py`: `StrictModel` base (`extra="forbid"`, `validate_assignment`, `hide_input_in_errors`); checked types `UtcDatetime` (naive rejected, stored in UTC), `IanaTimeZone`, `MemberAlias` (`M1`–`M7`), `Sha256Hex`, `EntityId`.
+- `app/core/models.py`: `Slot`, `Defense`, `CommitteeMember`, `AvailabilityStatement`, `Room`, `Booking`, `Message`, `ApprovalRequest`, `Timer`, `WorkflowEvent`, `TraceSpan`, `User`. PII and restricted fields are `repr=False`.
+- `app/core/state_machine.py`: `DEFENSE_TRANSITIONS` (37 rows + RESUME), `MEMBER_TRANSITIONS` (30 rows), `transition()`, `member_transition()`, `IllegalTransitionError` (logged). Raw strings are refused (`TypeError`).
+- `app/core/hashing.py`: `canonical_json`, `sha256_hex`.
+- `app/core/config.py`: `Settings` (pydantic-settings, `.env`), `PolicyConfig`, `ReminderConfig`, `ModelsConfig`, `AppConfig`, `load_app_config()`, `policy_version()` (sha256 of the canonical JSON of the values), `ConfigError`. YAML is read with a SafeLoader subclass that also refuses duplicate keys.
+- `config/policy.yaml`, `config/reminders.yaml`, `config/models.yaml` (all values ASSUMPTION or TO BE DECIDED).
+- `pyproject.toml`: `pydantic==2.13.5`, `pydantic-settings==2.15.0`, `PyYAML==6.0.3`, `email-validator==2.3.0` (versions: latest on PyPI via `pip index versions`, 30 Sep 2026).
+- `.env.example`: `APP_ENV`, `DEMO_MODE=false`, `LLM_API_KEY=`, `CONFIG_DIR`.
+- Tests: `tests/unit/test_state_machine.py`, `test_models.py`, `test_config.py`, `test_hashing.py`, `conftest.py` (305 new tests, 337 total, after the Windows fix below).
+- Docs: `state_machine.md` (new "Transition tables" section), `data_model.md` (`previous_status`, `TRUNCATED`, `Slot`, policy-version rule, optional `thread_token`, reminders/models/.env schemas), `failure_matrix.md` (FM-27), `config/README.md`, `README.md` status.
+
+**Results in the build workspace (Linux, Python 3.12.3)**
+- `ruff check .` → All checks passed. `ruff format --check .` → 30 files already formatted. `pytest` → 333 passed.
+- Coverage of `app/core`: 99% (2 lines not covered: the default `Settings()` path and a YAML error without a line mark).
+- `python -m pip_audit --skip-editable` → No known vulnerabilities found.
+- Time zone tests also pass with `PYTHONTZPATH=""` (no system zone database, as on Windows).
+- Mutation check: 10 deliberate bugs (drop a row, add an illegal row, remove the enum type check, weaken resume, `extra="ignore"`, show input in errors, plain SafeLoader, hash `repr` instead of canonical JSON, email in repr, `DEMO_MODE` default true) → each one makes at least one test fail.
+
+**Bug found and fixed:** a YAML list used as a key crashed with a raw `TypeError` instead of `ConfigError`. Regression test `test_list_used_as_a_key_is_rejected`; new row FM-27.
+
+**Fix found on Windows (30 Sep 2026)**
+- First Windows run: 332 passed, 1 failed: `test_invalid_time_zone_is_rejected[CET ]`. Cause: `ZoneInfo(name)` opens a file named after the zone, and Windows file names ignore trailing spaces and case, so `"CET "` (and `"asia/beirut"`) were accepted on Windows but refused on Linux.
+- Fix: `app/core/fields.py` now checks the name against the exact list `zoneinfo.available_timezones()` (minus the machine-specific `localtime`). Same result on every OS.
+- Regression cases added: `"Asia/Beirut "`, `"asia/beirut"`, `"ASIA/BEIRUT"`, `"localtime"`. Workspace: 337 passed (also with `PYTHONTZPATH=""`).
+
+**Fix found by CI (30 Sep 2026)**
+- `secret scan (gitleaks)` failed on the ST-02 pull request: rule `generic-api-key` matched the deliberately fake key `sk-live-CANARY-7F3A` in `tests/unit/test_config.py` (`test_api_key_is_hidden_in_repr_and_dump`). Cause: I did not run gitleaks on the new files before delivery.
+- Fix: that exact string added to the allowlist in `.gitleaks.toml` (same pattern as B-2); `threat_model.md` updated. Verified with gitleaks 8.30.1 on a scratch repository: the ST-02 commit passes (exit 0); a different fake key still fails (exit 1).
+- Also re-delivered `tests/unit/test_config.py`: the Windows-path fix for `test_unsafe_yaml_tag_is_rejected` had not reached the repository.
+- From now on, gitleaks is part of the verification step of every stage.
+
+**Not tested here:** GitHub CI (see the commands in the stage summary).
+
+**Open issues**
+- Member transitions not yet in the table (by design, doc lists them): clarification to a non-`NEEDS_CLARIFICATION` member (T04), second reply from a `REPLIED` member, early reply from a `DEFERRED` member, re-invites/re-polls after a reschedule. Owners: ST-08, ST-09, ST-11, ST-13.
+- `Message` has no timestamp field, but deduplication "within 24 h" (pipeline stage 2) needs one → ST-08.
+- Config values not yet in any file: confidence threshold 0.7, staleness 10 days, approval expiry 48 h, `max_wait` 3 days, step budget 8, extraction cap 10/day, body cap 4,000, budget caps → the stage that uses each adds it (with a doc edit).
+- `models.yaml` prices are 0 until the provider is chosen (ST-06).

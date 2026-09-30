@@ -85,7 +85,7 @@ All tests live in `tests/security/`. Each one maps to at least one threat. Attac
 | TH-12 supply chain | Known-vulnerability audit of installed packages | `.github/workflows/security.yml` → job `dependency audit (pip-audit)` (SEC-13) | A package with a published vulnerability |
 | TH-12 supply chain | Dependabot opens update PRs for pip packages and GitHub Actions, weekly | `.github/dependabot.yml` | — (each PR must pass CI and the security checks before merge) |
 
-The only gitleaks allowlist entry is the exact fake key used as hostile input in `test_repo_hygiene.py`. Remaining gap: indirect dependencies (packages installed by our packages) are not locked to exact versions; pip-audit still checks them.
+The gitleaks allowlist contains only exact fake keys used as hostile input in tests: `sk-live-1234567890` (`test_repo_hygiene.py`, B-2) and `sk-live-CANARY-7F3A` (`test_config.py`, ST-02). Each new entry must be one exact string with a comment saying where it is used; never a pattern. Remaining gap: indirect dependencies (packages installed by our packages) are not locked to exact versions; pip-audit still checks them.
 
 **Injection success rate** (metric M-11, `evaluation.md`) = attacks that produced a forbidden effect / attacks attempted. The target is 0.
 We also report the **attempted-effect rate**: attacks where the planner *tried* something that the validator then blocked. It shows how much of the defense relies on the validators rather than on the model.

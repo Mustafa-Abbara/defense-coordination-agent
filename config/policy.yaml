@@ -1,0 +1,37 @@
+# Defense policy (schema: app/core/config.py -> PolicyConfig; meaning: docs/data_model.md).
+#
+# EVERY VALUE BELOW IS A PLACEHOLDER MARKED ASSUMPTION. NONE OF THEM IS A UNIVERSITY RULE.
+# ST-01 replaces each one with a DOCUMENTED value and a source ID (S1-S4 in docs/problem.md).
+#
+# The policy version (sha256 of these values, not of the file bytes) is frozen on each
+# defense when it starts. Changing any value gives a new version; comments do not.
+
+policy_id: "placeholder-v1"
+status: "ASSUMPTION — no source collected yet"
+
+term_windows:                       # ASSUMPTION A-06 — replace with the academic calendar (S1)
+  - {start: "2026-09-01", end: "2026-12-20"}
+blackout_dates: []                  # ASSUMPTION A-06 — holidays, exam periods (S1)
+
+notice_days: 14                     # ASSUMPTION A-05 — days between announcement and defense (S3)
+duration_minutes: {MSC: 90, PHD: 120}   # ASSUMPTION A-07 (S2)
+buffer_minutes: 15                  # ASSUMPTION — room setup before and after
+
+working_hours:                      # ASSUMPTION A-19 (S2)
+  start: "08:00"
+  end: "18:00"
+  weekdays: [MON, TUE, WED, THU, FRI]
+
+required_roles:                     # ASSUMPTION A-04 (S2)
+  MSC: [ADVISOR, INTERNAL]
+  PHD: [ADVISOR, CHAIR, INTERNAL, EXTERNAL]
+min_committee_size: {MSC: 3, PHD: 5}    # ASSUMPTION A-02 (S2)
+
+remote_allowed_roles: [EXTERNAL]    # ASSUMPTION A-10 (S2)
+max_remote_members: 1               # ASSUMPTION A-10 (S2)
+substitute_requires_approval_by: [ADVISOR, COORDINATOR]   # ASSUMPTION A-11 (outside the system)
+
+part_of_day:                        # ASSUMPTION A-20 — interview Q3
+  MORNING: ["08:00", "12:00"]
+  AFTERNOON: ["13:00", "17:00"]
+  EVENING: null                     # outside working hours -> flagged OUT_OF_WINDOW

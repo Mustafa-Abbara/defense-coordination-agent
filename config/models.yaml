@@ -1,0 +1,22 @@
+# LLM calls (schema: app/core/config.py -> ModelsConfig). Used by the LLM client in ST-06.
+# The provider, model names, and prices are NOT DECIDED yet (ADR-008).
+# ST-06 fills them in from the provider's price page; until then prices are 0.
+
+status: "PLACEHOLDER — provider not decided (ADR-008)"
+provider: "undecided"
+
+calls:
+  extractor:                        # reads one email, returns ExtractionResult (no tools)
+    model: "undecided"
+    timeout_seconds: 30             # interfaces.md -> timeouts table
+    max_retries: 2                  # interfaces.md
+    temperature: 0.0                # interfaces.md, pipeline stage 5
+    price_in_usd_per_million_tokens: 0.0     # TO BE DECIDED (ST-06)
+    price_out_usd_per_million_tokens: 0.0    # TO BE DECIDED (ST-06)
+  planner:                          # chooses the next tool call
+    model: "undecided"
+    timeout_seconds: 45             # interfaces.md
+    max_retries: 2                  # interfaces.md
+    temperature: 0.0                # ASSUMPTION — fixed for reproducible runs
+    price_in_usd_per_million_tokens: 0.0     # TO BE DECIDED (ST-06)
+    price_out_usd_per_million_tokens: 0.0    # TO BE DECIDED (ST-06)
