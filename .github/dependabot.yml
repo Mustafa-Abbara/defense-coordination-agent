@@ -1,0 +1,19 @@
+# Dependabot (bonus B-2, threat TH-12): GitHub opens a pull request when a
+# pinned dependency has a new version or a known vulnerability.
+# Every Dependabot PR runs CI and the security checks before I merge it.
+version: 2
+updates:
+  - package-ecosystem: "pip"          # reads the pinned versions in pyproject.toml
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "github-actions"   # keeps actions/checkout, setup-python up to date
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"

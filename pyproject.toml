@@ -23,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 # Development tools: install with  pip install -e ".[dev]"
 dev = [
+    "pip-audit==2.10.1",   # dependency vulnerability scan (bonus B-2, TH-12)
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
     "ruff==0.16.9",

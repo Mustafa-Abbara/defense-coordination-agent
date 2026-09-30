@@ -1,0 +1,11 @@
+# gitleaks configuration (bonus B-2, threat TH-08).
+# Start from gitleaks' built-in rules and add a very narrow allowlist.
+title = "defense-coordination-agent"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deliberately fake key used as hostile input in tests/security/test_repo_hygiene.py"
+# Only this exact fake string is allowed. Any other key-like string still fails the scan.
+regexes = ['''sk-live-1234567890''']
