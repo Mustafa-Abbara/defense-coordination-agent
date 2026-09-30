@@ -100,7 +100,10 @@ Status words: **implemented** (code exists), **tested** (automated test passes),
 - Also re-delivered `tests/unit/test_config.py`: the Windows-path fix for `test_unsafe_yaml_tag_is_rejected` had not reached the repository.
 - From now on, gitleaks is part of the verification step of every stage.
 
-**Not tested here:** GitHub CI (see the commands in the stage summary).
+**Verified after delivery (30 Sep 2026)** — reported by me (the student); the full logs are on GitHub in the checks of the ST-02 pull request.
+- Windows, Python 3.12.6: `ruff check .` → All checks passed; `ruff format --check .` → 30 files already formatted; `pytest` → 337 passed.
+- ST-02 pull request: all 4 required checks green (`lint + tests (ubuntu-latest)`, `lint + tests (windows-latest)`, `secret scan (gitleaks)`, `dependency audit (pip-audit)`); merged into `main`; CI on `main` green.
+- **All ST-02 acceptance criteria: PASS**, on Linux, on Windows, and in CI.
 
 **Open issues**
 - Member transitions not yet in the table (by design, doc lists them): clarification to a non-`NEEDS_CLARIFICATION` member (T04), second reply from a `REPLIED` member, early reply from a `DEFERRED` member, re-invites/re-polls after a reschedule. Owners: ST-08, ST-09, ST-11, ST-13.
