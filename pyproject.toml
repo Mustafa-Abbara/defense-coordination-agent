@@ -14,10 +14,13 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 # Runtime dependencies. Rule from docs/architecture.md: a new runtime
 # dependency is added to the technology table there first, with its reason.
-# ST-00 only needs tzdata (IANA time zones for zoneinfo on Windows, ADR-012).
-# Later stages add pydantic, PyYAML, FastAPI, ... in the stage that uses them.
+# Later stages add FastAPI, argon2-cffi, ... in the stage that uses them.
 dependencies = [
-    "tzdata==2026.4",
+    "email-validator==2.3.0",     # EmailStr fields (ST-02; architecture.md supporting libraries)
+    "pydantic==2.13.5",           # models and validation (ST-02; architecture.md, core)
+    "pydantic-settings==2.15.0",  # .env settings (ST-02; architecture.md, core)
+    "PyYAML==6.0.3",              # policy.yaml, reminders.yaml, models.yaml (ST-02)
+    "tzdata==2026.4",             # IANA time zones for zoneinfo on Windows (ADR-012)
 ]
 
 [project.optional-dependencies]

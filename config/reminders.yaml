@@ -1,0 +1,12 @@
+# Reminder cadence and message limits (schema: app/core/config.py -> ReminderConfig).
+# Used by the deterministic timers (ST-04) and the tool rate limits (ST-09).
+# EVERY VALUE IS A PLACEHOLDER MARKED ASSUMPTION (docs/data_model.md, approval_policy.md AP-02/AP-03).
+
+status: "ASSUMPTION — no source collected yet"
+
+first_reminder_after_days: 3          # ASSUMPTION — days after the poll without a reply
+next_reminder_after_days: 3           # ASSUMPTION — days between reminders
+max_reminders: 2                      # ASSUMPTION — after the last one: member -> NON_RESPONSIVE
+confirmation_reminder_after_days: 2   # ASSUMPTION — in CONFIRMING (state_machine.md)
+clarification_min_gap_days: 2         # ASSUMPTION — at most 1 clarification per member per 2 days
+max_messages_per_member: 6            # ASSUMPTION — per member, per defense
