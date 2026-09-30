@@ -21,12 +21,15 @@ Status words: **implemented** (code exists), **tested** (automated test passes),
 - `ruff check .` → All checks passed. `ruff format --check .` → 18 files already formatted. `pytest` → 27 passed.
 - Negative checks: a real file calling `dt.now()` in `app/services/` → TID251 reported (exit 1); a repo where `.env` was committed then removed → `test_no_env_file_ever_committed` fails.
 
-**Not tested in the workspace (must be run by the student)**
-- Windows local run; GitHub repo creation; CI green on `main`; badge; `git log` on the real repository.
+**Verified after delivery (30 Sep 2026)**
+- Windows, Python 3.12.6: `ruff check .` → All checks passed; `ruff format --check .` → 19 files already formatted; `pytest` → 32 passed (run during B-2).
+- GitHub repo `Mustafa-Abbara/defense-coordination-agent` created; CI green on `ubuntu-latest` and `windows-latest` for every merged PR (#1, #2); `main` protected by ruleset `protect-main` (required checks: both CI jobs, gitleaks, pip-audit).
+- No `.env` ever committed: `test_no_env_file_ever_committed` runs in CI with full history (`fetch-depth: 0`) and passes.
+- **All ST-00 acceptance criteria: PASS.**
 
 **Open issues**
 - README badge has a `<GITHUB_USER>` placeholder. → Fixed (30 Sep).
-- Only direct dependencies are pinned; transitive dependencies are not locked (`threat_model.md` TH-12 mentions a lock file). Planned with bonus B-2 (`pip-audit`/Dependabot).
+- Only direct dependencies are pinned; transitive dependencies are not locked (`threat_model.md` TH-12 mentions a lock file). B-2 added scanning, not a lock file → still open.
 - `threat_model.md` TH-12 cites SEC-13, which is not defined in the SEC table. → Defined in B-2.
 - The ban covers only the four `datetime` calls named in ADR-010; `time.time()` and `datetime.fromtimestamp(time.time())` are other ways to read the real clock.
 
@@ -47,10 +50,15 @@ Status words: **implemented** (code exists), **tested** (automated test passes),
 - `python -m pip_audit --skip-editable` → No known vulnerabilities found (own package skipped as editable).
 - gitleaks on the repo: no leaks. gitleaks on a copy with a fake `ghp_…` token committed: 1 leak (`github-pat`), exit 1.
 
-**To be done on GitHub (evidence for the bonus)**
-- Enable Dependabot alerts and security updates; merge one reviewed Dependabot PR.
-- Demo branch with a fake key → gitleaks job red → screenshot → close PR and delete branch (never merge).
-- Add the two security jobs to the `protect-main` required checks.
+**Evidence on GitHub (30 Sep 2026)** — screenshots in `Project/evidence/` (outside the repo)
+- PR #1 (B-2) merged with all required checks green.
+- Demo PR #4 (`demo-fake-secret`, random fake `ghp_…` token): `secret scan (gitleaks)` failed (`RuleID: github-pat`, `Secret: REDACTED`, `leaks found: 1`, exit 1); merge blocked by the required check; PR closed unmerged and branch deleted. Screenshots: `PR_page.png`, `job_log.png`.
+- Dependabot PR #2 (`actions/checkout` 6→7) reviewed and merged, 8/8 checks passed. Screenshot: `b2_dependabot_pr2_merged.png`. Dependabot PR #3 (`actions/setup-python` 6→7) also merged (`main` now uses `setup-python@v7`).
+- `protect-main` requires: `lint + tests (ubuntu-latest)`, `lint + tests (windows-latest)`, `secret scan (gitleaks)`, `dependency audit (pip-audit)`.
+- **B-2 bonus evidence complete** (roadmap points 1–4).
+
+**Fix found during the demo**
+- The job log showed gitleaks scanning every fetched branch (no `--log-opts`). While a leaking branch exists on GitHub, runs on *other* branches would also fail. Fixed: `--log-opts="HEAD"` (scan the history of the commit under test). Verified locally: `main` passes while a leaking branch exists; the leaking branch fails.
 
 **Open issues**
 - Indirect dependencies are not locked (no lock file); pip-audit still audits them.

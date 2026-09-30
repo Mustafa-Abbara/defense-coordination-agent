@@ -40,8 +40,10 @@ jobs:
 
       - name: Scan git history
         # --redact: never print the secret itself in the CI log.
+        # --log-opts=HEAD: scan the full history of the commit being tested. Without it,
+        #   gitleaks scans every fetched branch, so one bad branch would turn every run red.
         # Exit code 1 (leak found) fails the job. Config: .gitleaks.toml
-        run: ./gitleaks git --redact --no-banner --verbose .
+        run: ./gitleaks git --redact --no-banner --verbose --log-opts="HEAD" .
 
   pip-audit:
     name: dependency audit (pip-audit)
