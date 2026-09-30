@@ -25,7 +25,32 @@ Status words: **implemented** (code exists), **tested** (automated test passes),
 - Windows local run; GitHub repo creation; CI green on `main`; badge; `git log` on the real repository.
 
 **Open issues**
-- README badge has a `<GITHUB_USER>` placeholder.
+- README badge has a `<GITHUB_USER>` placeholder. → Fixed (30 Sep).
 - Only direct dependencies are pinned; transitive dependencies are not locked (`threat_model.md` TH-12 mentions a lock file). Planned with bonus B-2 (`pip-audit`/Dependabot).
-- `threat_model.md` TH-12 cites SEC-13, which is not defined in the SEC table.
+- `threat_model.md` TH-12 cites SEC-13, which is not defined in the SEC table. → Defined in B-2.
 - The ban covers only the four `datetime` calls named in ADR-010; `time.time()` and `datetime.fromtimestamp(time.time())` are other ways to read the real clock.
+
+---
+
+## B-2 Secret scanning + dependency scanning (30 Sep 2026)
+
+**Built**
+- `.github/workflows/security.yml`: job `secret scan (gitleaks)` (gitleaks 8.30.1, downloaded with SHA-256 check, full history, `--redact`) and job `dependency audit (pip-audit)`; runs on push, pull request, weekly (Mon 05:17 UTC), and on demand.
+- `.gitleaks.toml`: default rules plus one allowlist entry for the exact fake key in `test_repo_hygiene.py` (found by gitleaks on the first local scan).
+- `.github/dependabot.yml`: weekly update PRs for pip (`pyproject.toml`) and GitHub Actions.
+- `pyproject.toml`: `pip-audit==2.10.1` added to `[dev]`.
+- `tests/security/test_dependency_pins.py` (5 tests, SEC-13): every dependency pinned with `==`; loose versions rejected.
+- Docs: `threat_model.md` (TH-08/TH-12 controls, new SEC-13 row, "Repository checks" section), `architecture.md` (pip-audit in supporting libraries).
+
+**Results in the build workspace (Linux, Python 3.12.3)**
+- `ruff check .` → All checks passed. `ruff format --check .` → 19 files already formatted. `pytest` → 32 passed.
+- `python -m pip_audit --skip-editable` → No known vulnerabilities found (own package skipped as editable).
+- gitleaks on the repo: no leaks. gitleaks on a copy with a fake `ghp_…` token committed: 1 leak (`github-pat`), exit 1.
+
+**To be done on GitHub (evidence for the bonus)**
+- Enable Dependabot alerts and security updates; merge one reviewed Dependabot PR.
+- Demo branch with a fake key → gitleaks job red → screenshot → close PR and delete branch (never merge).
+- Add the two security jobs to the `protect-main` required checks.
+
+**Open issues**
+- Indirect dependencies are not locked (no lock file); pip-audit still audits them.
