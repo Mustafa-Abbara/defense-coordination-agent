@@ -197,8 +197,10 @@ def test_duplicate_key_is_rejected(tmp_path: Path) -> None:
 def test_unsafe_yaml_tag_is_rejected(tmp_path: Path) -> None:
     # Hostile input: yaml.load (unsafe) would run this command. safe_load refuses.
     marker = tmp_path / "pwned.txt"
-    text = f'notice_days: !!python/object/apply:os.system ["echo pwned > {marker}"]\n'
-    with pytest.raises(ConfigError):
+    # Single quotes in YAML: no escape sequences, so a Windows path (C:\\...) stays valid
+    # YAML and the test really reaches the unsafe tag, not a syntax error.
+    text = f"notice_days: !!python/object/apply:os.system ['echo pwned > {marker}']\n"
+    with pytest.raises(ConfigError, match="python/object/apply"):
         load_policy(write(tmp_path, "policy.yaml", text))
     assert not marker.exists()
 

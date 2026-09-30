@@ -94,6 +94,12 @@ Status words: **implemented** (code exists), **tested** (automated test passes),
 - Fix: `app/core/fields.py` now checks the name against the exact list `zoneinfo.available_timezones()` (minus the machine-specific `localtime`). Same result on every OS.
 - Regression cases added: `"Asia/Beirut "`, `"asia/beirut"`, `"ASIA/BEIRUT"`, `"localtime"`. Workspace: 337 passed (also with `PYTHONTZPATH=""`).
 
+**Fix found by CI (30 Sep 2026)**
+- `secret scan (gitleaks)` failed on the ST-02 pull request: rule `generic-api-key` matched the deliberately fake key `sk-live-CANARY-7F3A` in `tests/unit/test_config.py` (`test_api_key_is_hidden_in_repr_and_dump`). Cause: I did not run gitleaks on the new files before delivery.
+- Fix: that exact string added to the allowlist in `.gitleaks.toml` (same pattern as B-2); `threat_model.md` updated. Verified with gitleaks 8.30.1 on a scratch repository: the ST-02 commit passes (exit 0); a different fake key still fails (exit 1).
+- Also re-delivered `tests/unit/test_config.py`: the Windows-path fix for `test_unsafe_yaml_tag_is_rejected` had not reached the repository.
+- From now on, gitleaks is part of the verification step of every stage.
+
 **Not tested here:** GitHub CI (see the commands in the stage summary).
 
 **Open issues**
