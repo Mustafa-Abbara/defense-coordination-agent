@@ -294,3 +294,62 @@ class UserRole(StrEnum):
     STUDENT = "STUDENT"
     OBSERVER = "OBSERVER"
     ADMIN = "ADMIN"
+
+
+# ---------------------------------------------------------------- deterministic services (ST-03)
+
+
+class ViolationCode(StrEnum):
+    """A broken policy rule, found by the policy engine (services/policy_engine.py)."""
+
+    # Setup checks (FR-02), run before coordination starts.
+    REQUIRED_ROLE_MISSING = "REQUIRED_ROLE_MISSING"  # no mandatory member has this role
+    COMMITTEE_TOO_SMALL = "COMMITTEE_TOO_SMALL"
+    COMMITTEE_TOO_LARGE = "COMMITTEE_TOO_LARGE"  # more than 7 (aliases M1-M7)
+    DUPLICATE_EMAIL = "DUPLICATE_EMAIL"
+    DUPLICATE_ALIAS = "DUPLICATE_ALIAS"
+    MEMBER_OF_OTHER_DEFENSE = "MEMBER_OF_OTHER_DEFENSE"
+    WINDOW_OUTSIDE_TERM = "WINDOW_OUTSIDE_TERM"
+    WINDOW_TOO_SHORT_FOR_NOTICE = "WINDOW_TOO_SHORT_FOR_NOTICE"
+    NO_WORKING_DAY_IN_WINDOW = "NO_WORKING_DAY_IN_WINDOW"
+    REMOTE_ROLE_NOT_ALLOWED = "REMOTE_ROLE_NOT_ALLOWED"
+    TOO_MANY_REMOTE_MEMBERS = "TOO_MANY_REMOTE_MEMBERS"
+    REMOTE_MEMBER_IN_PERSON_DEFENSE = "REMOTE_MEMBER_IN_PERSON_DEFENSE"
+    # Slot checks (check_slot), run by the solver, T07, and the executor.
+    WRONG_DURATION = "WRONG_DURATION"
+    NOT_A_WORKING_DAY = "NOT_A_WORKING_DAY"
+    OUTSIDE_WORKING_HOURS = "OUTSIDE_WORKING_HOURS"
+    BLACKOUT_DATE = "BLACKOUT_DATE"
+    OUTSIDE_TERM = "OUTSIDE_TERM"
+    OUTSIDE_WINDOW = "OUTSIDE_WINDOW"
+    NOTICE_DEADLINE_PASSED = "NOTICE_DEADLINE_PASSED"
+
+
+class BlockReason(StrEnum):
+    """Why a slot is not feasible for one member or for the rooms (near-miss reason).
+
+    interfaces.md T02 -> NearMiss.blocked_by. STALE is not a blocker: stale input is
+    still usable and is listed in SlotOption.low_confidence_inputs instead.
+    """
+
+    NO_REPLY = "NO_REPLY"  # the member has given no availability yet
+    UNAVAILABLE = "UNAVAILABLE"  # said unavailable at that time, declined it, or withdrew
+    NOT_STATED = "NOT_STATED"  # gave availability, but not for this time
+    UNCLEAR = "UNCLEAR"  # covered only by a low-confidence or flagged statement
+    CONDITION = "CONDITION"  # available only under a condition that cannot be met here
+    NO_ROOM = "NO_ROOM"  # no room fits (capacity, hybrid) and is free
+
+
+class OutputProblemCode(StrEnum):
+    """Why an outbound text was blocked by the output validator (FM-21, TH-02)."""
+
+    TOO_LONG = "TOO_LONG"
+    EMPTY = "EMPTY"
+    OTHER_MEMBER_ALIAS = "OTHER_MEMBER_ALIAS"
+    PROTECTED_TERM = "PROTECTED_TERM"  # another member's name, a private reason, or a canary
+    EMAIL_ADDRESS = "EMAIL_ADDRESS"
+    URL = "URL"
+    AMBIGUOUS_NUMERIC_DATE = "AMBIGUOUS_NUMERIC_DATE"  # "3/11": 3 Nov or 11 Mar?
+    INVALID_DATE = "INVALID_DATE"  # "31 Nov"
+    DATE_OUTSIDE_WINDOW = "DATE_OUTSIDE_WINDOW"
+    WEEKDAY_DATE_MISMATCH = "WEEKDAY_DATE_MISMATCH"

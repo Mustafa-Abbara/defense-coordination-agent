@@ -22,7 +22,7 @@ Entities from the brief that were **merged or dropped**:
 | owner_user_id | FK → User | The student |
 | title | str | Public once announced |
 | degree_level | enum `MSC`, `PHD` | Selects duration and role rules in PolicyConfig |
-| window_start, window_end | date | Chosen by the student; checked against term dates |
+| window_start, window_end | date | Chosen by the student; checked against term dates. Read in the university zone (`policy.timezone`) |
 | attendance_mode | enum `IN_PERSON`, `HYBRID_ALLOWED`, `HYBRID_REQUIRED` | Can change later (the chair changes requirements) |
 | expected_audience | int | For room capacity |
 | status | enum (see `state_machine.md`) | |
@@ -81,6 +81,7 @@ One statement = one piece of meaning from one message. A reply can produce sever
 ```yaml
 policy_id: "placeholder-v1"
 status: "ASSUMPTION — no source collected yet"
+timezone: "Asia/Beirut"            # A-21 — the university's zone; working hours, term, window, notice are read in it
 term_windows:                      # A-06 — replace with the academic calendar (S1)
   - {start: "2026-09-01", end: "2026-12-20"}
 blackout_dates: []                 # A-06 — holidays, exam periods
@@ -103,7 +104,7 @@ part_of_day:                       # A-20
 
 `config/reminders.yaml` is also a placeholder (ASSUMPTION): first reminder after 3 days, second after 3 more, then `NON_RESPONSIVE`. At most 1 clarification per member per 2 days. At most 6 messages to one member for each defense.
 
-The file is checked by `app/core/config.py` → `PolicyConfig` when it is loaded (ST-02): every degree level must have a duration, required roles, and a minimum committee size (at most 7, because aliases are `M1`–`M7`); `part_of_day` must list `MORNING`, `AFTERNOON`, and `EVENING` (`null` disables one); every start is before its end. A missing field, an unknown field, a duplicate key, or an unsafe YAML tag stops loading with a message that names the file and the field.
+The file is checked by `app/core/config.py` → `PolicyConfig` when it is loaded (ST-02; `timezone` added in ST-03, it must be an exact IANA name): every degree level must have a duration, required roles, and a minimum committee size (at most 7, because aliases are `M1`–`M7`); `part_of_day` must list `MORNING`, `AFTERNOON`, and `EVENING` (`null` disables one); every start is before its end. A missing field, an unknown field, a duplicate key, or an unsafe YAML tag stops loading with a message that names the file and the field.
 
 ### Other configuration (ST-02)
 
@@ -116,6 +117,14 @@ max_reminders: 2                      # then member -> NON_RESPONSIVE
 confirmation_reminder_after_days: 2   # in CONFIRMING
 clarification_min_gap_days: 2         # at most 1 clarification per member per 2 days
 max_messages_per_member: 6            # per member, per defense
+```
+
+`config/solver.yaml` (`SolverConfig`, ST-03, every value ASSUMPTION). These are system tuning values, not university rules, so they are not in `policy.yaml` and do not change the policy version:
+
+```yaml
+confidence_threshold: 0.7   # an AVAILABLE/CONDITIONAL statement counts only at or above this
+staleness_days: 10          # older statements are flagged stale (see Memory below)
+grid_minutes: 15            # slot start times every 15 minutes; must divide 60
 ```
 
 `config/models.yaml` (`ModelsConfig`): `provider`, and for each call kind (`extractor`, `planner`): `model`, `timeout_seconds`, `max_retries`, `temperature`, `price_in_usd_per_million_tokens`, `price_out_usd_per_million_tokens`. Provider, models, and prices are not decided (ADR-008); ST-06 fills them in.
@@ -285,5 +294,5 @@ There is no conversation history passed between wake-ups, no vector database, an
 | **Retrieval** | Deterministic `build_snapshot(defense)`. It creates a compact JSON (target under 3,000 tokens): defense summary, members by alias with status and a summary of active statements and open issues, the solver's top 5 feasible slots and top 5 near-misses, pending approvals, next timers, last 10 events, remaining budget, and the tools allowed in the current state. No similarity search is needed, because the state is small and fully structured. |
 | **Update rules** | Only deterministic handlers and tool executors write state. The agent cannot write fields directly; it can only call tools. Each save checks `state_version` (optimistic lock). Each change appends a `WorkflowEvent`. |
 | **Superseding** | A newer statement from the same member replaces older statements that overlap in time, **if** the newer one clearly corrects them ("sorry, I have a conflict after all"). If it conflicts without a clear correction, both are kept, marked `CONTRADICTS_PREVIOUS`, and a clarification is suggested. |
-| **Stale information** | Each statement has `observed_at`. A statement older than `staleness_days` (placeholder: 10 simulated days) when a schedule is proposed is marked stale in the snapshot. Stale statements are re-confirmed in the invite step: the invite asks each member to confirm. A `DEFERRAL` statement expires at its `recheck_at`. A room availability result is never cached; it is re-checked just before booking. |
+| **Stale information** | Each statement has `observed_at`. A statement older than `staleness_days` (`config/solver.yaml`, placeholder: 10 simulated days) when a schedule is proposed is marked stale in the snapshot. Stale statements are re-confirmed in the invite step: the invite asks each member to confirm. A `DEFERRAL` statement expires at its `recheck_at`. A room availability result is never cached; it is re-checked just before booking. |
 | **Privacy** | Aliases only in the planner. Private reasons are never in the snapshot. See the visibility table above. |

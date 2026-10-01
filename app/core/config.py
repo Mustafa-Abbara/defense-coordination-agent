@@ -4,7 +4,7 @@ Two sources, both read once at start-up:
 
 1. `.env` (secrets and switches) -> `Settings`, via pydantic-settings.
    Secrets live only here (TH-08). `.env` is never committed.
-2. YAML files in `config/` (policy, reminders, models) -> checked models.
+2. YAML files in `config/` (policy, reminders, models, solver) -> checked models.
    Every value in them is a placeholder marked ASSUMPTION until ST-01 finds a source.
 
 Any mistake (missing field, typo, wrong type, duplicate key, unsafe YAML)
@@ -21,7 +21,7 @@ from pydantic import ConfigDict, Field, SecretStr, ValidationError, field_valida
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.enums import DegreeLevel, PartOfDay, Role, SubstituteApprover, Weekday
-from app.core.fields import Sha256Hex, StrictModel
+from app.core.fields import IanaTimeZone, Sha256Hex, StrictModel
 from app.core.hashing import canonical_json, sha256_hex
 
 
@@ -106,6 +106,9 @@ class PolicyConfig(ConfigModel):
 
     policy_id: str = Field(min_length=1, max_length=100)
     status: str = Field(max_length=300)  # says whether values are ASSUMPTION or DOCUMENTED
+    # The university's time zone (A-21). Working hours, term dates, blackout dates,
+    # the defense window, and the notice deadline are all read in this zone (ST-03).
+    timezone: IanaTimeZone
     term_windows: list[DateWindow] = Field(min_length=1)  # A-06
     blackout_dates: list[date] = Field(default_factory=list)  # A-06
     notice_days: int = Field(ge=0)  # A-05
@@ -155,6 +158,30 @@ class ReminderConfig(ConfigModel):
     max_messages_per_member: int = Field(ge=1)  # per defense
 
 
+class SolverConfig(ConfigModel):
+    """config/solver.yaml: tuning values for the slot solver and T07 checks (ST-03).
+
+    These are system settings, not university rules, so they are not in policy.yaml
+    (changing them does not change the policy version).
+    """
+
+    status: str = Field(max_length=300)
+    # An AVAILABLE or CONDITIONAL statement counts only at or above this confidence.
+    confidence_threshold: float = Field(gt=0, le=1)
+    # A statement older than this (simulated days) is flagged as stale (data_model.md -> Memory).
+    staleness_days: int = Field(ge=1)
+    # Slot start times are on a grid of this many minutes (roadmap ST-03: 15).
+    grid_minutes: int = Field(ge=5, le=60)
+
+    @field_validator("grid_minutes")
+    @classmethod
+    def _grid_divides_an_hour(cls, value: int) -> int:
+        # 60 % value == 0 keeps every start on round clock times (08:00, 08:15, ...).
+        if 60 % value != 0:
+            raise ValueError("grid_minutes must divide 60 (for example 5, 10, 15, 30, 60)")
+        return value
+
+
 class ModelCallConfig(ConfigModel):
     """Settings for one kind of LLM call. Used by the LLM client (ST-06)."""
 
@@ -186,6 +213,7 @@ class AppConfig(ConfigModel):
     policy_version: Sha256Hex
     reminders: ReminderConfig
     models: ModelsConfig
+    solver: SolverConfig
 
 
 # ---------------------------------------------------------------- YAML reading
@@ -291,6 +319,10 @@ def load_models(path: Path) -> ModelsConfig:
     return _validate(ModelsConfig, read_yaml(path), path.name)
 
 
+def load_solver(path: Path) -> SolverConfig:
+    return _validate(SolverConfig, read_yaml(path), path.name)
+
+
 def policy_version(policy: PolicyConfig) -> str:
     """SHA-256 of the policy *values* (canonical JSON), not of the file bytes.
 
@@ -311,4 +343,5 @@ def load_app_config(settings: Settings | None = None) -> AppConfig:
         policy_version=policy_version(policy),
         reminders=load_reminders(config_dir / "reminders.yaml"),
         models=load_models(config_dir / "models.yaml"),
+        solver=load_solver(config_dir / "solver.yaml"),
     )

@@ -13,6 +13,20 @@ from typing import Any
 
 import pytest
 import yaml
+from hypothesis import HealthCheck, settings
+
+# Hypothesis (property tests, ST-03): the same examples on every run and every
+# machine (derandomize), no example database written to disk, and no time limit
+# per example (Windows CI runners are slower). Rule 6: reproducibility.
+settings.register_profile(
+    "project",
+    derandomize=True,
+    database=None,
+    deadline=None,
+    max_examples=100,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+settings.load_profile("project")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO_ROOT / "config"
@@ -201,12 +215,14 @@ def _examples() -> dict[str, dict[str, Any]]:
         "ModelCallConfig": _yaml("models.yaml")["calls"]["extractor"],
         "ModelCalls": _yaml("models.yaml")["calls"],
         "ModelsConfig": _yaml("models.yaml"),
+        "SolverConfig": _yaml("solver.yaml"),
         "Settings": {"_env_file": None, "app_env": "test"},
         "AppConfig": {
             "policy": _yaml("policy.yaml"),
             "policy_version": HEX_A,
             "reminders": _yaml("reminders.yaml"),
             "models": _yaml("models.yaml"),
+            "solver": _yaml("solver.yaml"),
         },
     }
 

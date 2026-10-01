@@ -6,7 +6,8 @@ Agentic Systems 503N/798S, Fall 2026, Path A. One orchestrating agent, determini
 services, and human approval coordinate a thesis defense from the first availability
 request to the confirmed booking and announcement.
 
-**Status:** ST-02 (domain models, configuration, state machines). No agent features yet.
+**Status:** ST-03 (deterministic core: date resolver, policy engine, slot solver, room
+filter, output validator). No agent features yet.
 The design documents are in [`docs/`](docs/README.md); the build plan is
 [`docs/roadmap.md`](docs/roadmap.md); progress is in [`docs/progress.md`](docs/progress.md).
 

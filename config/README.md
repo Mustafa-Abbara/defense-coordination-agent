@@ -8,6 +8,7 @@ message naming the file and the field (FM-27).
 | `policy.yaml` | `PolicyConfig` | policy engine, resolver, solver (ST-03) |
 | `reminders.yaml` | `ReminderConfig` | reminder timers (ST-04), rate limits (ST-09) |
 | `models.yaml` | `ModelsConfig` | LLM client (ST-06) |
+| `solver.yaml` | `SolverConfig` | slot solver, T07 checks (ST-03); not part of the policy version |
 
 Every value is a placeholder marked ASSUMPTION until ST-01 finds a source.
 Secrets never go here: they go in `.env` (see `.env.example`).

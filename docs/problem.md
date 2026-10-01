@@ -111,6 +111,9 @@ Code reads policy values from `config/policy.yaml`. That file points back to the
 | A-18 | Some members are abroad, in other time zones. | Time zone handling | Interview Q2 |
 | A-19 | Defenses happen within working hours (placeholder 08:00–18:00 local). | PolicyConfig `working_hours` | Source S2 |
 | A-20 | "Morning" and "afternoon" mean fixed ranges (placeholder 08:00–12:00 and 13:00–17:00). | Date/time resolver | Interview Q3 |
+| A-21 | Defenses take place at the university, in one time zone (placeholder `Asia/Beirut`). Working hours, term dates, the window, and the notice period are read in it. | PolicyConfig `timezone`; policy engine, solver | Source S1/S2 |
+| A-22 | "Available on Tuesday" without a time means the member's working hours that day; "not available on Tuesday" means the whole day. | Date/time resolver | Interview Q3; anonymized examples |
+| A-23 | `expected_audience` is the total number of people in the room (committee included), so it is the minimum room capacity. | Room filter | Interview Q7; source S4 |
 
 ---
 
