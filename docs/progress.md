@@ -137,7 +137,10 @@ Status words: **implemented** (code exists), **tested** (automated test passes),
 - Mutation check: 16 deliberate bugs (touching intervals overlap, low-confidence "no" ignored, `>` instead of `>=`, issues ignored, 2-blocker near-miss, zone ignored, repeated hour not flagged, notice in UTC days, weekday check removed, no invisible-character strip, no NFKC, no room buffer, no window clip, no ambiguous week, in-person condition ignored, aliases allowed) → each one makes at least one test fail.
 - gitleaks 8.30.1 on a scratch commit of the repository → no leaks found (exit 0). `pip-audit --skip-editable` → No known vulnerabilities found.
 
-**Not tested here:** Windows, GitHub CI (see the commands in the ST-03 summary).
+**Verified after delivery (1 Oct 2026)**: reported by me (the student). The full logs are on GitHub, in the checks of the ST-03 pull request.
+- Windows: `ruff check .`, `ruff format --check .`, and `pytest` all passed.
+- ST-03 pull request (branch `st-03-deterministic-core`): all 4 required checks green (`lint + tests (ubuntu-latest)`, `lint + tests (windows-latest)`, `secret scan (gitleaks)`, `dependency audit (pip-audit)`); merged into `main`. Local `main` fast-forwarded to `8cb22f2` (seen in `.git/logs/HEAD` and `.git/FETCH_HEAD`).
+- **All ST-03 acceptance criteria: PASS**, on Linux, on Windows, and in CI.
 
 **Open issues**
 - `AvailabilityStatement.intervals_utc` allows at most 100 intervals; a long window with several times per day could exceed it → decide in ST-08 (raise the cap or merge).
