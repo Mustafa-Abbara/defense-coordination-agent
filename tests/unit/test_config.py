@@ -18,6 +18,7 @@ from app.core.config import (
     load_models,
     load_policy,
     load_reminders,
+    load_solver,
     policy_version,
 )
 from app.core.enums import DegreeLevel
@@ -270,6 +271,51 @@ def test_models_config_rejects_negative_price(tmp_path: Path) -> None:
     path = write(tmp_path, "models.yaml", yaml.safe_dump(data))
     with pytest.raises(ConfigError, match="price_in_usd_per_million_tokens"):
         load_models(path)
+
+
+# ---------------------------------------------------------------- ST-03 additions
+
+
+def test_policy_needs_a_real_university_time_zone(tmp_path: Path) -> None:
+    data = policy_dict()
+    del data["timezone"]
+    with pytest.raises(ConfigError, match="timezone: missing"):
+        load_policy(write_policy(tmp_path, data))
+    data["timezone"] = "Beirut"  # not an IANA name
+    with pytest.raises(ConfigError, match="timezone"):
+        load_policy(write_policy(tmp_path, data))
+
+
+def test_repository_solver_config_loads() -> None:
+    solver = load_solver(CONFIG_DIR / "solver.yaml")
+    assert solver.grid_minutes == 15
+    assert 0 < solver.confidence_threshold <= 1
+    assert "ASSUMPTION" in solver.status
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("grid_minutes", 7),  # does not divide 60
+        ("grid_minutes", 0),
+        ("confidence_threshold", 0),
+        ("confidence_threshold", 1.5),
+        ("staleness_days", 0),
+    ],
+)
+def test_solver_config_rejects_bad_values(tmp_path: Path, field: str, value: object) -> None:
+    data = yaml.safe_load((CONFIG_DIR / "solver.yaml").read_text(encoding="utf-8"))
+    data[field] = value
+    path = write(tmp_path, "solver.yaml", yaml.safe_dump(data))
+    with pytest.raises(ConfigError, match=field):
+        load_solver(path)
+
+
+def test_solver_values_do_not_change_the_policy_version() -> None:
+    # Tuning the solver is not a policy change (solver.yaml is a separate file).
+    app_config = load_app_config(Settings(_env_file=None, config_dir=CONFIG_DIR))
+    assert app_config.policy_version == policy_version(app_config.policy)
+    assert "confidence_threshold" not in app_config.policy.model_dump()
 
 
 # ---------------------------------------------------------------- .env settings (TH-05, TH-08)

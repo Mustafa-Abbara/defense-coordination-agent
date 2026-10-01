@@ -9,6 +9,9 @@
 policy_id: "placeholder-v1"
 status: "ASSUMPTION — no source collected yet"
 
+timezone: "Asia/Beirut"             # ASSUMPTION A-21 — the university's zone; working hours,
+                                    # term, window, and notice are read in it (ST-03)
+
 term_windows:                       # ASSUMPTION A-06 — replace with the academic calendar (S1)
   - {start: "2026-09-01", end: "2026-12-20"}
 blackout_dates: []                  # ASSUMPTION A-06 — holidays, exam periods (S1)

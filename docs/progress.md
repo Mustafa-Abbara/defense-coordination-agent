@@ -110,3 +110,37 @@ Status words: **implemented** (code exists), **tested** (automated test passes),
 - `Message` has no timestamp field, but deduplication "within 24 h" (pipeline stage 2) needs one → ST-08.
 - Config values not yet in any file: confidence threshold 0.7, staleness 10 days, approval expiry 48 h, `max_wait` 3 days, step budget 8, extraction cap 10/day, body cap 4,000, budget caps → the stage that uses each adds it (with a doc edit).
 - `models.yaml` prices are 0 until the provider is chosen (ST-06).
+
+---
+
+## ST-03 Deterministic core: resolver, policy engine, slot solver, room filter (1 Oct 2026)
+
+**Built**
+- `app/services/intervals.py`: half-open `[start, end)` helpers (`overlaps`, `contains`, `merge`, `subtract`, `clip`).
+- `app/services/local_time.py`: wall-clock → UTC with `zoneinfo` (fold=0), detection of repeated/missing local times (DST).
+- `app/services/date_resolver.py`: `DayRef`, `TimeRef`, `ResolverContext`, `Resolution`, `resolve_statement()`. Issue codes `AMBIGUOUS_WEEK`, `AMBIGUOUS_DAY`, `WEEKDAY_DATE_MISMATCH`, `OUT_OF_WINDOW`, `TZ_UNCLEAR`, `UNPARSEABLE`.
+- `app/services/policy_engine.py`: `PolicyEngine` (`validate_setup`, `check_slot`, `notice_deadline`), `DefenseSetup`, `Violation`.
+- `app/services/room_filter.py`: `fitting_rooms()` (capacity, hybrid, busy + buffer, smallest first), `defense_needs_hybrid()`.
+- `app/services/slot_solver.py`: `find_slots()` → `SolverResult` (feasible with deterministic score, near-misses with one `BlockReason`, `infeasible_summary`), `candidate_slots()` (15-minute grid), `slot_id()`, `spread_out()`.
+- `app/services/output_validator.py`: `check_outbound_text()` (aliases, names, private reasons, canaries, emails, URLs, numeric/invalid/out-of-window dates, weekday mismatch, length; NFKC + invisible-character removal).
+- `app/core/enums.py`: `ViolationCode`, `BlockReason`, `OutputProblemCode`.
+- Config: `PolicyConfig.timezone` (`Asia/Beirut`, A-21); new `config/solver.yaml` → `SolverConfig` (`confidence_threshold` 0.7, `staleness_days` 10, `grid_minutes` 15), loaded into `AppConfig.solver`.
+- `pyproject.toml`: `hypothesis==6.168.3` in `[dev]` (latest on PyPI via `pip index versions`, 1 Oct 2026). `.gitignore`: `.hypothesis/`.
+- Tests (178 new): `test_intervals.py` (6), `test_date_resolver.py` (50), `test_dst.py` (17), `test_policy_engine.py` (26), `test_room_filter.py` (8), `test_slot_solver.py` (36), `test_output_validator.py` (27), `test_config.py` (+8); helpers in `tests/unit/builders.py`; Hypothesis profile (derandomized, no database) in `tests/unit/conftest.py`.
+- Docs: `interfaces.md` (PolicyService + `DefenseSetup`/`Violation`, `BlockReason`, stale = flag, tighter `TimeRef` pattern, new "Deterministic services" section), `data_model.md` (`timezone`, `solver.yaml`), `problem.md` (A-21, A-22, A-23), `architecture.md` (hypothesis row), `threat_model.md` (TH-02 control, SEC-02 unit level), `failure_matrix.md` (unit-test pointers for FM-02, FM-15, FM-21), `config/README.md`, `README.md` status.
+
+**Results in the build workspace (Linux, Python 3.12.3)**
+- `ruff check .` → All checks passed. `ruff format --check .` → 45 files already formatted. `pytest` → 517 passed, 1 skipped (the git-history test; the workspace copy has no `.git`; it passes in a scratch git copy: `tests/security` 9 passed).
+- Coverage of `app/services/`: 99% (749 statements, 0 missed; 3 partial branches).
+- 5 Hypothesis properties: solver hard constraints (≈43% of examples have feasible slots, ≈60% near-misses, so the property is not vacuous), resolver window, room filter, interval math, planted secrets in the output validator.
+- DST tests also pass with `PYTHONTZPATH=""` (tzdata package only, as on Windows).
+- Mutation check: 16 deliberate bugs (touching intervals overlap, low-confidence "no" ignored, `>` instead of `>=`, issues ignored, 2-blocker near-miss, zone ignored, repeated hour not flagged, notice in UTC days, weekday check removed, no invisible-character strip, no NFKC, no room buffer, no window clip, no ambiguous week, in-person condition ignored, aliases allowed) → each one makes at least one test fail.
+- gitleaks 8.30.1 on a scratch commit of the repository → no leaks found (exit 0). `pip-audit --skip-editable` → No known vulnerabilities found.
+
+**Not tested here:** Windows, GitHub CI (see the commands in the ST-03 summary).
+
+**Open issues**
+- `AvailabilityStatement.intervals_utc` allows at most 100 intervals; a long window with several times per day could exceed it → decide in ST-08 (raise the cap or merge).
+- `CONTRADICTS_PREVIOUS` and superseding need earlier statements → ST-08.
+- Name matching in the output validator uses name parts of 4+ letters: false positives are possible for names that are common words (the text is then blocked and rewritten, the safe side); spelled-out tricks ("D.a.n.a") are not caught.
+- The solver checks coverage per statement (one interval must hold the whole slot), not across two adjacent statements.

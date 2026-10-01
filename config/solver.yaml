@@ -1,0 +1,10 @@
+# Slot solver settings (schema: app/core/config.py -> SolverConfig; meaning: docs/data_model.md).
+#
+# These are SYSTEM tuning values, not university rules, so they live outside policy.yaml
+# and do not change the policy version. Every value is a placeholder (ASSUMPTION).
+
+status: "ASSUMPTION — placeholder values chosen by us"
+
+confidence_threshold: 0.7   # ASSUMPTION — an AVAILABLE/CONDITIONAL statement counts at or above this
+staleness_days: 10          # ASSUMPTION — older statements are flagged stale (data_model.md -> Memory)
+grid_minutes: 15            # roadmap ST-03 — slot start times every 15 minutes

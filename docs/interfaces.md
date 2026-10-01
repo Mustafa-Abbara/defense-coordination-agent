@@ -78,12 +78,21 @@ class RoomService(Protocol):
     def cancel_booking(self, ref: str, idempotency_key: str) -> BookingStatus: ...
     # Asynchronous: the mock emits RoomDecision and RoomLost events on the clock queue.
 
-class PolicyService(Protocol):
+class PolicyService(Protocol):                              # implemented by PolicyEngine (ST-03)
     def current(self) -> PolicyConfig: ...
-    def version(self) -> str: ...                              # sha256 of policy.yaml
-    def validate_setup(self, d: DefenseSetup) -> list[Violation]: ...
+    def version(self) -> str: ...                              # sha256 of the policy values (data_model.md)
+    def validate_setup(self, setup: DefenseSetup, now: datetime) -> list[Violation]: ...
     def check_slot(self, d: Defense, slot: Slot, now: datetime) -> list[Violation]: ...
     def notice_deadline(self, slot: Slot) -> datetime: ...     # last moment the announcement can go out
+
+class DefenseSetup(BaseModel):          # everything on the setup screen (FR-01)
+    defense: Defense
+    members: list[CommitteeMember]      # at most 20 in the schema; the size rule is a Violation
+
+class Violation(BaseModel):             # one broken rule; aliases only, never names or emails
+    code: ViolationCode                 # app/core/enums.py, e.g. REQUIRED_ROLE_MISSING, NOTICE_DEADLINE_PASSED
+    field: str                          # the setup field that causes it, e.g. "window_end", "members.M3"
+    message: str
 
 class StateRepository(Protocol):
     def lock(self, defense_id: str) -> ContextManager[None]: ...          # one writer per defense
@@ -149,18 +158,29 @@ class SlotOption(BaseModel):
     conditions: list[str]         # e.g. "M5: HYBRID_REQUIRED"
     rooms_free: int
     notice_deadline: datetime
-    low_confidence_inputs: list[str]   # aliases whose statements are stale or below the threshold
+    low_confidence_inputs: list[str]   # aliases whose statement used for this slot is stale (older than staleness_days)
     hypothetical: bool
 
 class NearMiss(BaseModel):
     slot_id: str; start: datetime; end: datetime
-    blocked_by: list[tuple[str, str]]   # (alias or "ROOM", reason code: NO_REPLY | UNAVAILABLE | CONDITION | NO_ROOM | STALE)
+    blocked_by: list[tuple[str, BlockReason]]   # exactly one entry: (alias or "ROOM", reason)
+
+class BlockReason(StrEnum):       # app/core/enums.py (ST-03)
+    NO_REPLY = "NO_REPLY"         # the member has given no availability yet
+    UNAVAILABLE = "UNAVAILABLE"   # said unavailable then, declined it, or withdrew
+    NOT_STATED = "NOT_STATED"     # gave availability, but not for this time
+    UNCLEAR = "UNCLEAR"           # covered only by a statement below the threshold or with an open issue
+    CONDITION = "CONDITION"       # a condition that cannot be met (or cannot be checked by code)
+    NO_ROOM = "NO_ROOM"           # no room fits and is free
 
 class FindSlotsOut(BaseModel):
     feasible: list[SlotOption]
     near_misses: list[NearMiss]
-    infeasible_summary: dict[str, int]  # reason code → number of slots removed
+    infeasible_summary: dict[str, int]  # BlockReason or ViolationCode value → number of slots removed
 ```
+
+- **Implementation:** the solver is `app/services/slot_solver.py` (`find_slots`, ST-03); the tool (ST-09) only wraps it. `max_results` uses `spread_out()`, which skips options that overlap an option already picked.
+- **Stale is a flag, not a blocker.** A stale statement still counts (it is re-confirmed by the invite, `data_model.md` → Memory) and its alias is listed in `low_confidence_inputs`. A low-confidence or flagged "available" never makes a slot feasible (`UNCLEAR`); a flagged "unavailable" still blocks (the safe side).
 
 - **Validation:** bounds. **Side effects:** none. **Timeout:** 5 s. **Retry:** 1. **Approval:** no (R0).
 - **Note:** hypothetical slots are marked `hypothetical=True` and **cannot** be used in T07. The validator rejects them.
@@ -293,16 +313,16 @@ Email text **never** triggers an action directly. It can only become a *validate
 ### Extraction output schema
 
 ```python
-class DayRef(BaseModel):
+class DayRef(BaseModel):                         # app/services/date_resolver.py (ST-03)
     date: date | None = None                     # an explicit date written in the email
-    weekday: Literal["MON","TUE","WED","THU","FRI","SAT","SUN"] | None = None
+    weekday: Weekday | None = None               # MON … SUN (app/core/enums.py)
     week: Literal["THIS", "NEXT", "ANY_IN_WINDOW", "SPECIFIC"] | None = None
     week_of: date | None = None                  # when week == "SPECIFIC"
 
 class TimeRef(BaseModel):
     part_of_day: Literal["MORNING", "AFTERNOON", "EVENING", "ALL_DAY"] | None = None
-    start: str | None = Field(None, pattern=r"^\d{2}:\d{2}$")   # as written; the resolver applies the time zone
-    end: str | None = Field(None, pattern=r"^\d{2}:\d{2}$")
+    start: str | None = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")   # a real clock time 00:00–23:59, as written
+    end: str | None = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")     # the resolver applies the time zone
 
 class ExtractedStatement(BaseModel):
     kind: Literal["AVAILABLE","UNAVAILABLE","CONDITIONAL","DEFERRAL","WITHDRAWAL","CONFIRM","DECLINE"]
@@ -324,6 +344,24 @@ class ExtractionResult(BaseModel):
 ```
 
 The LLM never outputs a UTC timestamp. It reports what the text says. Code decides what it means.
+
+---
+
+## Deterministic services (ST-03)
+
+Plain Python in `app/services/`. No LLM, no clock reads (time is passed in as `now`), no I/O. The tools (ST-09), the inbound pipeline (ST-08), and the executor (ST-11) call them.
+
+| Module | Main function | Input → output | Used by |
+|---|---|---|---|
+| `date_resolver.py` | `resolve_statement(kind, days, times, except_times, context, policy)` | `DayRef`/`TimeRef` + `ResolverContext` (member zone, window, `received_at`, degree level, mentioned zone) → `Resolution(intervals_utc, issues, dates)` | Pipeline stage 7 |
+| `policy_engine.py` | `PolicyEngine.validate_setup`, `check_slot`, `notice_deadline` | see `PolicyService` above | Setup screen (FR-02), solver, T07, executor |
+| `slot_solver.py` | `find_slots(SolverInput, engine, solver_config)` | defense, members, statements, rooms with busy times, `now`, `what_if_pending_available` → `SolverResult(feasible, near_misses, infeasible_summary)` | T02, snapshot, B1 baseline |
+| `room_filter.py` | `fitting_rooms(candidates, slot, min_capacity, needs_hybrid, buffer_minutes)` | rooms with busy times → rooms that fit, smallest capacity first, then by id | Solver, T03, executor |
+| `output_validator.py` | `check_outbound_text(text, OutputContext)` | text + recipient alias, members, private reasons, window, max length → `OutputCheck(ok, problems)` | T04, T10 |
+
+**Resolver rules.** Days and clock times are read in the member's registered zone; the window, working hours, term, blackout dates, and notice are read in the university zone (`policy.timezone`, A-21). Weeks start on Monday; `THIS`/`NEXT` count from the member-local date of `received_at`. An unclear phrase gives intervals for every possible meaning **plus** an issue code (`AMBIGUOUS_WEEK`, `AMBIGUOUS_DAY`, `WEEKDAY_DATE_MISMATCH`). A day without a time means the member's working hours for an available-type statement and the whole day for `UNAVAILABLE`/`DECLINE` (A-22). A start time alone means a defense starting then (start + duration). A written clock time that happens twice or never on that day (DST) gives `TZ_UNCLEAR`. A mentioned zone ("CET", "my time") is compared with the zone's real abbreviation on those dates; a mismatch gives `TZ_UNCLEAR`, and the registered zone is still used. Intervals are cut to the window; a day reference with no date left inside the window gives `OUT_OF_WINDOW`.
+
+**Output validator problems** (`OutputProblemCode`): `EMPTY`, `TOO_LONG`, `OTHER_MEMBER_ALIAS`, `PROTECTED_TERM` (another member's name or name part of 4+ letters, a private reason, or a `CANARY-…` token), `EMAIL_ADDRESS` (any), `URL` (any), `AMBIGUOUS_NUMERIC_DATE` ("3/11"), `INVALID_DATE`, `DATE_OUTSIDE_WINDOW`, `WEEKDAY_DATE_MISMATCH`. The text is NFKC-normalized and invisible format characters are removed before matching. Problem details never repeat a protected value. When the recipient is the owner student (T10 summaries), aliases and private reasons are allowed; names, emails, links, and date checks still apply.
 
 ---
 

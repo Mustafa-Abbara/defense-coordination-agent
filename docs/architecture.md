@@ -252,6 +252,7 @@ If the evaluation shows the fixed-rule baseline (B1) matches the agent on these 
 | `python-multipart` | HTML form posts in FastAPI | ST-12 |
 | `httpx` (dev) | FastAPI `TestClient` in API tests | ST-12 |
 | `pytest-cov` (dev) | Coverage reports and the coverage targets in the roadmap | ST-00 |
+| `hypothesis` (dev) | Property tests for the resolver, solver, room filter, and output validator (the Hypothesis row above) | ST-03 |
 | `pip-audit` (dev) | Known-vulnerability scan of installed packages (threat TH-12, bonus B-2) | B-2 |
 
 ### Setup without Docker (Windows, default)
