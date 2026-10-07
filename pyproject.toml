@@ -20,7 +20,7 @@ dependencies = [
     "pydantic==2.13.5",           # models and validation (ST-02; architecture.md, core)
     "pydantic-settings==2.15.0",  # .env settings (ST-02; architecture.md, core)
     "PyYAML==6.0.3",              # policy.yaml, reminders.yaml, models.yaml (ST-02)
-    "tzdata==2026.4",             # IANA time zones for zoneinfo on Windows (ADR-012)
+    "tzdata==2026.5",             # IANA time zones for zoneinfo on Windows (ADR-012)
 ]
 
 [project.optional-dependencies]
