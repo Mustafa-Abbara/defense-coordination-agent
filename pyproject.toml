@@ -30,7 +30,7 @@ dev = [
     "pip-audit==2.10.1",   # dependency vulnerability scan (bonus B-2, TH-12)
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
-    "ruff==0.16.9",
+    "ruff==0.17.0",
 ]
 
 [tool.setuptools.packages.find]
