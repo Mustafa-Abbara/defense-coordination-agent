@@ -18,7 +18,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "email-validator==2.3.0",     # EmailStr fields (ST-02; architecture.md supporting libraries)
     "pydantic==2.13.5",           # models and validation (ST-02; architecture.md, core)
-    "pydantic-settings==2.15.0",  # .env settings (ST-02; architecture.md, core)
+    "pydantic-settings==2.16.0",  # .env settings (ST-02; architecture.md, core)
     "PyYAML==6.0.3",              # policy.yaml, reminders.yaml, models.yaml (ST-02)
     "tzdata==2026.4",             # IANA time zones for zoneinfo on Windows (ADR-012)
 ]
